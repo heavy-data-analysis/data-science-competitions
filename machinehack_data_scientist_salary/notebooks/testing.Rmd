@@ -1,0 +1,226 @@
+---
+title: "Analyzing Data Scientist's salaries"
+output: html_notebook
+editor_options: 
+  chunk_output_type: inline
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+library(tidyverse)
+```
+
+
+```{r}
+raw_train <- read_csv("../data/Final_Train_Dataset.csv")
+raw_test <- read_csv("../data/Final_Test_Dataset.csv")
+```
+
+```{r}
+# options(width=60)
+
+# head(raw_train)
+# str(raw_train)
+
+raw_test %>%
+  map(~sum(is.na(.)))
+
+raw_train %>%
+  summarise_all(list(~sum(is.na(.))))
+```
+
+
+```{r}
+clean_data <- raw_train %>%
+  mutate(salary = fct_reorder(salary, parse_number(salary))) %>%
+  select(-job_type) %>%
+  mutate(
+    mn = parse_number(experience),
+    mx = str_extract(experience, "-\\d+") %>% parse_number() %>% abs(),
+    mean_exp = (mn + mx) / 2
+  ) %>%
+  select(-c("mn", "mx", "experience")) %>%
+  mutate(location = str_extract(location, "\\w+")) %>%
+  mutate(location = fct_lump(location, 13))
+
+# str(clean_data)
+# head(clean_data)
+
+clean_data %>%
+  mutate(salary = gsub('to', '-', salary)) %>%
+  mutate(salary = fct_reorder(salary, parse_number(salary))) %>%
+  ggplot(aes(salary)) +
+  geom_bar() +
+  geom_label(y = 0, aes(label = stat(count)), stat = "count") +
+  labs(title = "Target analysis", x="Salary range in lakhs", y="")
+
+
+```
+
+```{r}
+plot_categorical <- function(df, column, n_levels=10) {
+  df %>%
+    mutate({{ column }} := fct_lump(factor({{ column }}), 10)) %>%
+    mutate({{ column }} :=  fct_infreq({{ column }})) %>%
+    filter({{ column }} != "Other") %>%
+    ggplot(aes({{ column }}, fill = factor(salary))) +
+    geom_bar()
+    # labs(x = "Company Code", title = "Top 10 companies by frequency vs Salary")
+}
+```
+
+
+```{r}
+clean_data %>%
+  count(company_name_encoded, sort = TRUE)
+
+plot_categorical(clean_data, company_name_encoded, 10) +
+  xlab("Company name encoded") +
+  ylab("")
+```
+
+
+```{r}
+clean_data %>%
+  count(location, sort = TRUE)
+
+plot_categorical(clean_data, location) + coord_flip()
+```
+
+
+```{r}
+clean_data %>%
+  group_by(salary) %>%
+  summarise(m_exp = mean(mean_exp)) %>%
+  ggplot(aes(salary, m_exp)) +
+  geom_col() +
+  labs(x = "Salary category", y = "Mean experience")
+```
+
+
+```{r}
+plot_categorical(clean_data, job_desig, 15) + coord_flip()
+```
+
+
+```{r}
+lm(mean_exp ~ salary, data = clean_data)
+```
+
+
+```{r}
+clean_data <- clean_data %>% 
+  mutate(new_loc = str_extract(location, "\\w+")) %>%
+  count(new_loc, sort = TRUE)
+
+clean
+
+
+clean_data %>% 
+  mutate(new_loc = str_extract(location, "\\w+")) %>%
+  mutate(new_loc = fct_lump(new_loc, 13)) %>%
+  filter(new_loc != "Other") %>%
+  ggplot(aes(salary, new_loc)) +
+  geom_bin2d() + 
+  labs(x = "Salary range", y = "Location",
+       title = "How does the salary range vary with region?")
+```
+## Key skills
+
+```{r}
+# options(width = 100)
+# strsplit(clean_data[1, key_skills], ",")  
+
+clean_data %>%
+  mutate(n_skills = 
+           str_remove(key_skills, "\\.\\.\\.") %>% 
+           str_split(",")
+         ) %>%
+  unnest(cols = c(n_skills)) %>%
+  filter(n_skills != "") %>%
+  mutate(n_skills = 
+           str_trim(n_skills) %>% 
+           fct_lump(20) %>%
+           fct_infreq() %>%
+           fct_rev()
+         ) %>%
+  filter(n_skills != "Other") %>%
+  count(n_skills, sort = TRUE) %>%
+  ggplot(aes(n_skills, n)) +
+  geom_col() +
+  geom_rect(aes(xmin = 15.5, xmax = 20.5, ymin= -10, ymax= 1100), 
+            alpha = 0.01, fill = "blue", color = "black") +
+  labs(title = "Most sought out skills in the Data Science field", 
+       y = "No. of companies looking for this skill", x = "") +
+  coord_flip()
+```
+
+
+```{r}
+clean_data
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+Add a new chunk by clicking the *Insert Chunk* button on the toolbar or by pressing *Ctrl+Alt+I*.
+
+When you save the notebook, an HTML file containing the code and output will be saved alongside it (click the *Preview* button or press *Ctrl+Shift+K* to preview the HTML file).
+
+The preview shows you a rendered HTML copy of the contents of the editor. Consequently, unlike *Knit*, *Preview* does not run any R code chunks. Instead, the output of the chunk when it was last run in the editor is displayed.

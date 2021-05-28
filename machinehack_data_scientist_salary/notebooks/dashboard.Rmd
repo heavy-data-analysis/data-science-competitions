@@ -1,0 +1,189 @@
+---
+title: "Data Scientist Salary Analysis"
+output: 
+  flexdashboard::flex_dashboard:
+    vertical_layout: fill
+    orientation: columns
+runtime: shiny
+---
+
+```{r setup, include=FALSE}
+library(flexdashboard)
+library(tidyverse)
+library(DT)
+library(knitr)
+library(kableExtra)
+library(crosstalk)
+```
+
+```{r read-data}
+data <- read_csv("../data/Final_Train_Dataset.csv")
+```
+
+# Data Overview {data-icon="fa-table"}
+
+```{r clean-data}
+data <- data %>%
+  mutate(
+    mn = parse_number(experience),
+    mx = str_extract(experience, "-\\d+") %>% parse_number() %>% abs(),
+    mean_exp = (mn + mx) / 2
+  ) %>%
+  select(-c("mn", "mx", "experience")) %>%
+  mutate(location = str_extract(location, "\\w+"))
+```
+
+## Column {data-width=600}
+
+### Top 15 rows in the dataset
+
+```{r show-head}
+data %>%
+  slice(1:10) %>%
+  select(-job_type) %>%
+  mutate(job_description = str_trim(job_description)) %>%
+  kbl() %>%
+  kable_paper("hover", font_size = 10)
+```
+## Column
+
+### Overall Salary ranges counts
+
+```{r salary-counts}
+data %>%
+  mutate(salary = gsub('to', '-', salary)) %>%
+  mutate(salary = fct_reorder(salary, parse_number(salary))) %>%
+  ggplot(aes(salary)) +
+  geom_bar() +
+  geom_label(y = 0, aes(label = stat(count)), stat = "count") +
+  labs(x="Salary range in lakhs", y="")
+```
+
+### Location counts
+
+```{r location-counts}
+data %>%
+  mutate(location = fct_lump(factor(location), 12) 
+         %>% fct_infreq() %>% fct_rev()) %>%
+  filter(location != "Other") %>%
+  ggplot(aes(location)) +
+  geom_bar() +
+  coord_flip() +
+  labs(x = "", y = "")
+```
+
+# Location Analysis {data-icon="fa-dashboard" data-orientation=rows}
+
+## Inputs {.sidebar}
+
+```{r}
+value_data <- data %>%
+  select(c(key_skills, location, company_name_encoded, mean_exp)) %>%
+  group_by(location) %>%
+  summarise(avg_exp = mean(mean_exp) %>% round(2), 
+            n_comp = n_distinct(company_name_encoded)) %>%
+  subset(n_comp > 45) %>%
+  mutate(location = ifelse(location == "Navi", "Navi Mumbai", location))
+
+shared_data <- SharedData$new(value_data)
+
+filter_select("location", "Choose Location", shared_data, 
+              group = ~location, multiple = F)
+```
+
+## Row
+
+### Average Experience of data scientists
+
+```{r}
+# valueBox(shared_data[1, 2])
+value <- shared_data[1, 1]
+```
+
+## Row
+### Filtered data
+
+```{r}
+datatable(shared_data)
+```
+
+<!-- # # Location Analysis {data-icon="fa-dashboard" data-orientation=rows} -->
+<!-- #  -->
+<!-- # ## Inputs {.sidebar}  -->
+<!-- #  -->
+<!-- # ```{r inputs} -->
+<!-- # loc.options <- data %>% -->
+<!-- #   count(location, sort = TRUE) %>% -->
+<!-- #   subset(n > 250) %>% -->
+<!-- #   select(location) -->
+<!-- #  -->
+<!-- # selectInput("location_choice", "Choose a location", choices = loc.options) -->
+<!-- # sliderInput("top_skills", "Number of top skills", min = 5, max = 13, value = 8) -->
+<!-- #  -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- # ## Row -->
+<!-- #  -->
+<!-- # ### No. of companies at location -->
+<!-- #  -->
+<!-- # ```{r n-companies} -->
+<!-- # total.companies <- reactive({ -->
+<!-- #   data %>% -->
+<!-- #   filter(location == input$location_choice) %>% -->
+<!-- #   count(company_name_encoded) %>% -->
+<!-- #   nrow() -->
+<!-- # }) -->
+<!-- #  -->
+<!-- # renderValueBox( -->
+<!-- #   valueBox(total.companies(), icon = "fa-cubes") -->
+<!-- # ) -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- #  -->
+<!-- # ### Average experience of the data scientists -->
+<!-- #  -->
+<!-- # ```{r avg-exp} -->
+<!-- # avg.exp <- reactive({ -->
+<!-- #   data %>% -->
+<!-- #     filter(location == input$location_choice) %>% -->
+<!-- #     summarise_at("mean_exp", mean) %>% -->
+<!-- #     round(2) -->
+<!-- # }) -->
+<!-- #  -->
+<!-- # renderValueBox( -->
+<!-- #   valueBox(paste(avg.exp(), "years"), icon = "fa-pagelines") -->
+<!-- # ) -->
+<!-- # ``` -->
+<!-- #  -->
+<!-- # ## Row -->
+<!-- #  -->
+<!-- # ### In demand skills at the location -->
+<!-- #  -->
+<!-- # ```{r plot-skills} -->
+<!-- # skills.plot <- reactive({ -->
+<!-- #   data %>% -->
+<!-- #     filter(location == input$location_choice) %>% -->
+<!-- #     mutate(n_skills =  -->
+<!-- #              str_remove(key_skills, "\\.\\.\\.") %>%  -->
+<!-- #              str_split(",") -->
+<!-- #            ) %>% -->
+<!-- #     unnest(cols = c(n_skills)) %>% -->
+<!-- #     filter(n_skills != "") %>% -->
+<!-- #     mutate(n_skills =  -->
+<!-- #              str_trim(n_skills) %>%  -->
+<!-- #              fct_lump(input$top_skills) %>% -->
+<!-- #              fct_infreq() %>% -->
+<!-- #              fct_rev() -->
+<!-- #            ) %>% -->
+<!-- #     filter(n_skills != "Other") %>% -->
+<!-- #     count(n_skills, sort = TRUE) %>% -->
+<!-- #     ggplot(aes(n_skills, n)) + -->
+<!-- #     geom_col() + -->
+<!-- #     labs(y = "No. of companies looking for this skill", x = "") + -->
+<!-- #     coord_flip() -->
+<!-- # }) -->
+<!-- #  -->
+<!-- # renderPlot(skills.plot()) -->
+<!-- ``` -->
+
+
